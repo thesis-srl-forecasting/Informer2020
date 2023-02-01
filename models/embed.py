@@ -4,7 +4,11 @@ import torch.nn.functional as F
 
 import math
 
+# c_in = enc_in (class Informer) = 1 in univariate task (arg feafures)
+
 class PositionalEmbedding(nn.Module):
+    # Define embedding for each sequence postion (up to max_len), then
+    # in forward() just extract the relevant embeddings (until size of sequence)
     def __init__(self, d_model, max_len=5000):
         super(PositionalEmbedding, self).__init__()
         # Compute the positional encodings once in log space.
@@ -24,6 +28,11 @@ class PositionalEmbedding(nn.Module):
         return self.pe[:, :x.size(1)]
 
 class TokenEmbedding(nn.Module):
+    # c_in is d-dim of data input sequence, standard case we only take the price
+    # time series alone, so c_in = 1 (different to the length of input sequence seq_len)
+    
+    # Conv1D: kernel move along the time series (only 1 direction)
+    # kernel has 'depth' = d_model -> convert 1 ts into d_model ts
     def __init__(self, c_in, d_model):
         super(TokenEmbedding, self).__init__()
         padding = 1 if torch.__version__>='1.5.0' else 2

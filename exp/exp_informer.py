@@ -3,7 +3,7 @@ from exp.exp_basic import Exp_Basic
 from models.model import Informer, InformerStack
 
 from utils.tools import EarlyStopping, adjust_learning_rate
-from utils.metrics import metric
+from utils.metrics import metric, RevenueLoss, WeightedRMSE
 
 import numpy as np
 
@@ -116,7 +116,9 @@ class Exp_Informer(Exp_Basic):
         return model_optim
     
     def _select_criterion(self):
-        criterion =  nn.MSELoss()
+        # criterion =  nn.MSELoss()
+        # criterion = RevenueLoss()
+        criterion = WeightedRMSE(alpha=self.args.alpha)
         return criterion
     
     def vali(self, vali_data, vali_loader, criterion):
@@ -166,6 +168,13 @@ class Exp_Informer(Exp_Basic):
                 pred, true = self._process_one_batch(
                     train_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
                 loss = criterion(pred, true)
+                
+                # Investigate output
+                # Out has size of [batchsize, pred_len, target]
+                print(f'Pred is type: {type(pred)} and has shape {pred.shape}')
+                print(f'True is type: {type(true)} and has shape {true.shape}')
+                print(f'Loss is {loss}, type: {type(loss)} and has shape {loss.shape}')
+                
                 train_loss.append(loss.item())
                 
                 if (i+1) % 100==0:

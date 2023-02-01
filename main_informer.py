@@ -1,6 +1,8 @@
 import argparse
 import os
 import torch
+from datetime import datetime
+now = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
 # Define class
 from exp.exp_informer import Exp_Informer
@@ -59,6 +61,8 @@ parser.add_argument('--gpu', type=int, default=0, help='gpu')
 parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple gpus', default=False)
 parser.add_argument('--devices', type=str, default='0,1,2,3',help='device ids of multile gpus')
 
+parser.add_argument('--alpha', type=float, default=10,help='weighted parameter for loss function')
+
 args = parser.parse_args() # Pass a list of arguements here to run in Jupyter, for example: ['--model=informer', '--data=ETTh1']
 
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
@@ -106,12 +110,14 @@ Exp = Exp_Informer
 # Loop through iterations
 for ii in range(args.itr):
     # setting record of experiments
-    setting = '{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}_{}'.format(args.model, args.data, args.features, 
+    setting = '{}_{}_alpha{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}_{}'.format(args.model, args.data, args.alpha, args.features, 
                 args.seq_len, args.label_len, args.pred_len,
                 args.d_model, args.n_heads, args.e_layers, args.d_layers, args.d_ff, args.attn, args.factor, 
                 args.embed, args.distil, args.mix, args.des, ii)
-
+    setting = setting + '_' + now
     exp = Exp(args) # set experiments
+    
+    print(f'DO_PREDICT={args.do_predict}')
     print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
     exp.train(setting)
     
