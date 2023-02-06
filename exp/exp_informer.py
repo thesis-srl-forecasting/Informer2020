@@ -340,3 +340,84 @@ class Exp_Informer(Exp_Basic):
 
         return outputs, batch_y
 
+
+def tune(self, setting, train_iter=0):
+        
+        # Retrieve different data & loader here in the train loop
+        train_data, train_loader = self._get_data(flag = 'train')
+        vali_data, vali_loader = self._get_data(flag = 'val')
+        test_data, test_loader = self._get_data(flag = 'test')
+
+        path = os.path.join(self.args.checkpoints, setting)
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        time_now = time.time()
+        
+        train_steps = len(train_loader)
+        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        
+        model_optim = self._select_optimizer()
+        criterion =  self._select_criterion()
+        
+        if self.args.use_amp:
+            scaler = torch.cuda.amp.GradScaler()
+
+        for epoch in range(self.args.train_epochs):
+            iter_count = 0
+            train_loss = []
+            
+            self.model.train()
+            epoch_time = time.time()
+            for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(train_loader):
+                iter_count += 1
+                
+                model_optim.zero_grad()
+                pred, true = self._process_one_batch(
+                    train_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
+                loss = criterion(pred, true)
+                
+                # Investigate output
+                # Out has size of [batchsize, pred_len, target]
+                # print(f'Pred is type: {type(pred)} and has shape {pred.shape}')
+                # print(f'True is type: {type(true)} and has shape {true.shape}')
+                # print(f'Loss is {loss}, type: {type(loss)} and has shape {loss.shape}')
+                
+                train_loss.append(loss.item())
+                
+                if (i+1) % 100==0:
+                    print("\titers: {0}, epoch: {1} | loss: {2:.7f}".format(i + 1, epoch + 1, loss.item()))
+                    speed = (time.time()-time_now)/iter_count
+                    left_time = speed*((self.args.train_epochs - epoch)*train_steps - i)
+                    print('\tspeed: {:.4f}s/iter; left time: {:.4f}s'.format(speed, left_time))
+                    iter_count = 0
+                    time_now = time.time()
+                
+                if self.args.use_amp:
+                    scaler.scale(loss).backward()
+                    scaler.step(model_optim)
+                    scaler.update()
+                else:
+                    loss.backward()
+                    model_optim.step()
+
+            print("Epoch: {} cost time: {}".format(epoch+1, time.time()-epoch_time))
+            train_loss = np.average(train_loss)
+            vali_loss = self.vali(vali_data, vali_loader, criterion)
+            test_loss = self.vali(test_data, test_loader, criterion)
+            
+            writer.add_scalar(f'Train loss iter {train_iter}', train_loss, epoch)
+
+            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
+                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
+            early_stopping(vali_loss, self.model, path)
+            if early_stopping.early_stop:
+                print("Early stopping")
+                break
+
+            adjust_learning_rate(model_optim, epoch+1, self.args)
+            
+        best_model_path = path+'/'+'checkpoint.pth'
+        self.model.load_state_dict(torch.load(best_model_path))
+        
+        return self.model
