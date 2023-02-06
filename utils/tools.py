@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import pandas as pd
 
 def adjust_learning_rate(optimizer, epoch, args):
     # lr = args.learning_rate * (0.2 ** (epoch // 2))
@@ -74,3 +75,13 @@ class StandardScaler():
             mean = mean[-1:]
             std = std[-1:]
         return (data * std) + mean
+    
+    
+def convert_predict_sequences(seq_raw, train_scaler, inverse=True):
+    if inverse: 
+        seq = train_scaler.inverse_transform(seq_raw)
+    else: seq = seq_raw
+    array = seq.squeeze()
+    array = np.array([np.concatenate([np.repeat(np.nan, i), array[i], np.repeat(np.nan, self.pred_len-i)]) for i in np.arange(self.pred_len)])
+    df = pd.DataFrame(array.transpose())
+    return df.mean(axis=1)

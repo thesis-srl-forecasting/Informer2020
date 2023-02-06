@@ -2,8 +2,10 @@ from data.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custo
 from exp.exp_basic import Exp_Basic
 from models.model import Informer, InformerStack
 
-from utils.tools import EarlyStopping, adjust_learning_rate
+from utils.tools import EarlyStopping, adjust_learning_rate, convert_predict_sequences
 from utils.metrics import metric, RevenueLoss, WeightedRMSE
+
+from models.result import ProcessedResult
 
 import numpy as np
 
@@ -17,6 +19,9 @@ import time
 
 import warnings
 warnings.filterwarnings('ignore')
+
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
 
 class Exp_Informer(Exp_Basic):
     def __init__(self, args):
@@ -73,6 +78,17 @@ class Exp_Informer(Exp_Basic):
             'Solar':Dataset_Custom,
             'custom':Dataset_Custom,
             'SRL_NEG_00_04':Dataset_Custom,
+            'SRL_NEG_04_08':Dataset_Custom,
+            'SRL_NEG_08_12':Dataset_Custom,
+            'SRL_NEG_12_16':Dataset_Custom,
+            'SRL_NEG_16_20':Dataset_Custom,
+            'SRL_NEG_20_24':Dataset_Custom,
+            'SRL_POS_00_04':Dataset_Custom,
+            'SRL_POS_04_08':Dataset_Custom,
+            'SRL_POS_08_12':Dataset_Custom,
+            'SRL_POS_12_16':Dataset_Custom,
+            'SRL_POS_16_20':Dataset_Custom,
+            'SRL_POS_20_24':Dataset_Custom,
         }
         
         Data = data_dict[self.args.data]
@@ -133,7 +149,7 @@ class Exp_Informer(Exp_Basic):
         self.model.train()
         return total_loss
 
-    def train(self, setting):
+    def train(self, setting, train_iter=0):
         
         # Retrieve different data & loader here in the train loop
         train_data, train_loader = self._get_data(flag = 'train')
@@ -171,9 +187,9 @@ class Exp_Informer(Exp_Basic):
                 
                 # Investigate output
                 # Out has size of [batchsize, pred_len, target]
-                print(f'Pred is type: {type(pred)} and has shape {pred.shape}')
-                print(f'True is type: {type(true)} and has shape {true.shape}')
-                print(f'Loss is {loss}, type: {type(loss)} and has shape {loss.shape}')
+                # print(f'Pred is type: {type(pred)} and has shape {pred.shape}')
+                # print(f'True is type: {type(true)} and has shape {true.shape}')
+                # print(f'Loss is {loss}, type: {type(loss)} and has shape {loss.shape}')
                 
                 train_loss.append(loss.item())
                 
@@ -197,6 +213,8 @@ class Exp_Informer(Exp_Basic):
             train_loss = np.average(train_loss)
             vali_loss = self.vali(vali_data, vali_loader, criterion)
             test_loss = self.vali(test_data, test_loader, criterion)
+            
+            writer.add_scalar(f'Train loss iter {train_iter}', train_loss, epoch)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
                 epoch + 1, train_steps, train_loss, vali_loss, test_loss))
@@ -212,8 +230,9 @@ class Exp_Informer(Exp_Basic):
         
         return self.model
 
-    def test(self, setting):
+    def test(self, setting, test_iter=0):
         test_data, test_loader = self._get_data(flag='test')
+        train_data, _ = self._get_data(flag='train')
         
         self.model.eval()
         
@@ -228,22 +247,32 @@ class Exp_Informer(Exp_Basic):
 
         preds = np.array(preds)
         trues = np.array(trues)
+        
         print('test shape:', preds.shape, trues.shape)
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1]) # Batch x pred_row x pred_col
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         print('test shape:', preds.shape, trues.shape)
 
-        # result save
-        folder_path = './results/' + setting +'/'
-        if not os.path.exists(folder_path):
-            os.makedirs(folder_path)
-
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('mse:{}, mae:{}'.format(mse, mae))
+        
+        if self.args.itr - test_iter == 1:
+        
+            # result save
+            folder_path = './results/' + setting +'/'
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+                
+            # post-process results
+            results = ProcessedResult(preds, trues, train_data.scaler)
+            fig = results.plot_pred_vs_true(results.pred)
+            fig.savefig(folder_path+'informer_forecast.png')
+            fig = results.plot_pred_vs_true(results.pred_naive)
+            fig.savefig(folder_path+'naive_forecast.png')
 
-        np.save(folder_path+'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
-        np.save(folder_path+'pred.npy', preds)
-        np.save(folder_path+'true.npy', trues)
+            np.save(folder_path+'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
+            np.save(folder_path+'pred.npy', preds)
+            np.save(folder_path+'true.npy', trues)
 
         return
 

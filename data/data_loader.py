@@ -323,6 +323,10 @@ class Dataset_Custom(Dataset):
         self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
+        # print('-------------')
+        # print('Info of raw data')
+        # print(df_raw.info())
+        # print('-------------')
         '''
         df_raw.columns: ['date', ...(other features), target feature]
         '''
@@ -355,6 +359,7 @@ class Dataset_Custom(Dataset):
 
         if self.scale: # Scale data based on train mean + sd
             train_data = df_data[border1s[0]:border2s[0]]
+            
             self.scaler.fit(train_data.values)
             data = self.scaler.transform(df_data.values) # Scale all columns with respective mean & sd
         else:

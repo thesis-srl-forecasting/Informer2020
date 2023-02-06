@@ -1,1 +1,1 @@
-python -u main_informer.py --model informer --data SRL_NEG_00_04 --attn prob --freq d
+python -u main_informer.py --model informer --data SRL_NEG_00_04 --attn prob --freq d --alpha 12 --train_epochs 6 --itr 6 --seq_len 112 --pred_len 2
