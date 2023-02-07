@@ -164,25 +164,38 @@ if __name__ == "__main__":
 
 
     # Define search space 
-    search_space = {"learning_rate": tune.loguniform(1e-4, 1e-2), "train_epochs": tune.randint(6, 20)}
+    search_space = {'learning_rate': tune.loguniform(1e-4, 1e-2), 
+                    'train_epochs': tune.randint(6, 20),
+                    'alpha': tune.quniform(1, 20, 0.5),
+                    'seq_len': tune.choice([14, 28, 42, 56, 70, 84, 98, 112, 126, 140]),
+                    # 'pred_len': tune.sample_from(lambda spec: spec.config.seq_len / 2)
+                    }
     algo = OptunaSearch()
 
     # Define objective function
     def objective(config):
-        args.learning_rate = config["learning_rate"]
-        args.train_epochs = config["train_epochs"]
-        
-        print(f'--------------Start new run-------------------')
-        print(f'Tune learning rate: {args.learning_rate}')
-        print(f'Tune train epochs: {args.train_epochs}')
-        
-        setting = '{}_{}_alpha{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}'.format(args.model, args.data, args.alpha, args.features, 
-                    args.seq_len, args.label_len, args.pred_len,
-                    args.d_model, args.n_heads, args.e_layers, args.d_layers, args.d_ff, args.attn, args.factor, 
-                    args.embed, args.distil, args.mix, args.des)
-        setting = setting + '_' + now
 
         while True:
+            
+            args.learning_rate = config["learning_rate"]
+            args.train_epochs = config["train_epochs"]
+            args.alpha = config['alpha']
+            args.seq_len = config['seq_len']
+            # args.pred_len = config['pred_len']
+        
+            print(f'--------------Start new run-------------------')
+            print(f'Tune learning rate: {args.learning_rate}')
+            print(f'Tune train epochs: {args.train_epochs}')
+            print(f'Tune alpha: {args.alpha}')
+            print(f'Tune seq_len: {args.seq_len}')
+            # print(f'Tune pred_len: {args.pred_len}')
+        
+            setting = '{}_{}_alpha{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_at{}_fc{}_eb{}_dt{}_mx{}_{}'.format(args.model, args.data, args.alpha, args.features, 
+                        args.seq_len, args.label_len, args.pred_len,
+                        args.d_model, args.n_heads, args.e_layers, args.d_layers, args.d_ff, args.attn, args.factor, 
+                        args.embed, args.distil, args.mix, args.des)
+            setting = setting + '_' + now
+            
             exp = Exp(args)
             revenue = exp.tune(setting) # Compute metric
             session.report({"accumulated_revenue": revenue})  # Report to Tune

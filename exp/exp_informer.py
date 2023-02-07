@@ -418,7 +418,7 @@ class Exp_Informer(Exp_Basic):
             test_loss, test_revenue = self.vali(test_data, test_loader, criterion)
 
             print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f} Vali Revenue: {5:.7f} Test Revenue: {5:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss, vali_revenue, vali_loss))
+                epoch + 1, train_steps, train_loss, vali_loss, test_loss, vali_revenue, test_revenue))
             early_stopping_no_save(vali_loss, self.model)
             if early_stopping_no_save.early_stop:
                 print("Early stopping")
