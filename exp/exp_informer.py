@@ -2,7 +2,7 @@ from data.data_loader import Dataset_ETT_hour, Dataset_ETT_minute, Dataset_Custo
 from exp.exp_basic import Exp_Basic
 from models.model import Informer, InformerStack
 
-from utils.tools import EarlyStopping, adjust_learning_rate, convert_predict_sequences
+from utils.tools import EarlyStopping, EarlyStoppingNoSaveModel, adjust_learning_rate, convert_predict_sequences
 from utils.metrics import metric, RevenueLoss, WeightedRMSE
 
 from models.result import ProcessedResult
@@ -140,14 +140,25 @@ class Exp_Informer(Exp_Basic):
     def vali(self, vali_data, vali_loader, criterion):
         self.model.eval()
         total_loss = []
+        total_revenue = []
         for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(vali_loader):
             pred, true = self._process_one_batch(
                 vali_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
-            loss = criterion(pred.detach().cpu(), true.detach().cpu())
+            
+            pred = pred.detach().cpu()
+            true = true.detach().cpu()
+            
+            loss = criterion(pred, true)
             total_loss.append(loss)
+            
+            revenue = np.where(pred-true > 0, 0, pred).sum()
+            total_revenue.append(revenue)
+            
         total_loss = np.average(total_loss)
+        total_revenue = np.sum(total_revenue)
+        
         self.model.train()
-        return total_loss
+        return total_loss, total_revenue
 
     def train(self, setting, train_iter=0):
         
@@ -341,21 +352,21 @@ class Exp_Informer(Exp_Basic):
         return outputs, batch_y
 
 
-def tune(self, setting, train_iter=0):
+    def tune(self, setting):
         
         # Retrieve different data & loader here in the train loop
         train_data, train_loader = self._get_data(flag = 'train')
         vali_data, vali_loader = self._get_data(flag = 'val')
         test_data, test_loader = self._get_data(flag = 'test')
 
-        path = os.path.join(self.args.checkpoints, setting)
-        if not os.path.exists(path):
-            os.makedirs(path)
+        # path = os.path.join(self.args.checkpoints, setting)
+        # if not os.path.exists(path):
+        #     os.makedirs(path)
 
         time_now = time.time()
         
         train_steps = len(train_loader)
-        early_stopping = EarlyStopping(patience=self.args.patience, verbose=True)
+        early_stopping_no_save = EarlyStoppingNoSaveModel(patience=self.args.patience, verbose=True)
         
         model_optim = self._select_optimizer()
         criterion =  self._select_criterion()
@@ -403,21 +414,21 @@ def tune(self, setting, train_iter=0):
 
             print("Epoch: {} cost time: {}".format(epoch+1, time.time()-epoch_time))
             train_loss = np.average(train_loss)
-            vali_loss = self.vali(vali_data, vali_loader, criterion)
-            test_loss = self.vali(test_data, test_loader, criterion)
-            
-            writer.add_scalar(f'Train loss iter {train_iter}', train_loss, epoch)
+            vali_loss, vali_revenue = self.vali(vali_data, vali_loader, criterion)
+            test_loss, test_revenue = self.vali(test_data, test_loader, criterion)
 
-            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f}".format(
-                epoch + 1, train_steps, train_loss, vali_loss, test_loss))
-            early_stopping(vali_loss, self.model, path)
-            if early_stopping.early_stop:
+            print("Epoch: {0}, Steps: {1} | Train Loss: {2:.7f} Vali Loss: {3:.7f} Test Loss: {4:.7f} Vali Revenue: {5:.7f} Test Revenue: {5:.7f}".format(
+                epoch + 1, train_steps, train_loss, vali_loss, test_loss, vali_revenue, vali_loss))
+            early_stopping_no_save(vali_loss, self.model)
+            if early_stopping_no_save.early_stop:
                 print("Early stopping")
                 break
 
             adjust_learning_rate(model_optim, epoch+1, self.args)
             
-        best_model_path = path+'/'+'checkpoint.pth'
-        self.model.load_state_dict(torch.load(best_model_path))
+        # Turn off saving model
         
-        return self.model
+        # best_model_path = path+'/'+'checkpoint.pth'
+        # self.model.load_state_dict(torch.load(best_model_path))
+        
+        return vali_revenue
