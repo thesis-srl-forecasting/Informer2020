@@ -140,7 +140,7 @@ class Exp_Informer(Exp_Basic):
     def vali(self, vali_data, vali_loader, criterion):
         self.model.eval()
         total_loss = []
-        total_revenue = []
+        # total_revenue = []
         for i, (batch_x,batch_y,batch_x_mark,batch_y_mark) in enumerate(vali_loader):
             pred, true = self._process_one_batch(
                 vali_data, batch_x, batch_y, batch_x_mark, batch_y_mark)
@@ -151,14 +151,14 @@ class Exp_Informer(Exp_Basic):
             loss = criterion(pred, true)
             total_loss.append(loss)
             
-            revenue = np.where(pred-true > 0, 0, pred).sum()
-            total_revenue.append(revenue)
+            # revenue = np.where(pred-true > 0, 0, pred).sum()
+            # total_revenue.append(revenue)
             
         total_loss = np.average(total_loss)
-        total_revenue = np.sum(total_revenue)
+        # total_revenue = np.sum(total_revenue)
         
         self.model.train()
-        return total_loss, total_revenue
+        return total_loss
 
     def train(self, setting, train_iter=0):
         

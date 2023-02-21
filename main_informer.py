@@ -1,6 +1,7 @@
 import argparse
 import os
 import torch
+import numpy as np
 from datetime import datetime
 now = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 
@@ -46,7 +47,7 @@ parser.add_argument('--do_predict', action='store_true', help='whether to predic
 parser.add_argument('--mix', action='store_false', help='use mix attention in generative decoder', default=True)
 parser.add_argument('--cols', type=str, nargs='+', help='certain cols from the data files as the input features')
 parser.add_argument('--num_workers', type=int, default=0, help='data loader num workers')
-parser.add_argument('--itr', type=int, default=2, help='experiments times')
+parser.add_argument('--itr', type=int, default=1, help='experiments times')
 parser.add_argument('--train_epochs', type=int, default=6, help='train epochs')
 parser.add_argument('--batch_size', type=int, default=32, help='batch size of train input data')
 parser.add_argument('--patience', type=int, default=3, help='early stopping patience')
@@ -63,8 +64,12 @@ parser.add_argument('--use_multi_gpu', action='store_true', help='use multiple g
 parser.add_argument('--devices', type=str, default='0,1,2,3',help='device ids of multile gpus')
 
 parser.add_argument('--alpha', type=float, default=10,help='weighted parameter for loss function')
+parser.add_argument('--label_len_ratio', type=float, default=0,help='ratio of label len to seq len')
 
-args = parser.parse_args() # Pass a list of arguements here to run in Jupyter, for example: ['--model=informer', '--data=ETTh1']
+
+# args = parser.parse_args() # Pass a list of arguments here to run in Jupyter, for example: ['--model=informer', '--data=ETTh1']
+
+args = parser.parse_args(['--model=informer', '--data=SRL_NEG_12_16', '--learning_rate=0.0021934', '--train_epochs=12', '--alpha=2.0', '--seq_len=70', '--label_len_ratio=0.35', '--d_model=1280', '--pred_len=2']) # Pass a list of arguements here to run in Jupyter, for example: ['--model=informer', '--data=ETTh1']
 
 args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
@@ -113,6 +118,9 @@ if args.data in data_parser.keys():
 args.s_layers = [int(s_l) for s_l in args.s_layers.replace(' ','').split(',')]
 args.detail_freq = args.freq
 args.freq = args.freq[-1:]
+
+if args.label_len_ratio > 0:
+    args.label_len = int(np.round(args.label_len_ratio * args.seq_len))
 
 print('Args in experiment:')
 print(args)
